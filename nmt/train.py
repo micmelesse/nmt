@@ -514,86 +514,93 @@ def train(hparams, scope=None, target_session=""):
   # This is the training loop.
   stats, info, start_train_time = before_train(
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
-  while global_step < num_train_steps:
-    ### Run a step ###
-    start_time = time.time()
-    try:
-      step_result = loaded_train_model.train(train_sess)
-      hparams.epoch_step += 1
-    except tf.errors.OutOfRangeError:
-      # Finished going through the training dataset.  Go to next epoch.
-      hparams.epoch_step = 0
-      utils.print_out(
-          "# Finished an epoch, step %d. Perform external evaluation" %
-          global_step)
-      run_sample_decode(infer_model, infer_sess, model_dir, hparams,
-                        summary_writer, sample_src_data, sample_tgt_data)
-      run_external_eval(infer_model, infer_sess, model_dir, hparams,
-                        summary_writer)
 
-      if avg_ckpts:
-        run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
-                              summary_writer, global_step)
+  with tf.contrib.tfprof.ProfileContext('/tmp/train_dir',
+                                        trace_steps=range(100, 200, 3),
+                                        dump_steps=[200]) as pctx:
+        opts = tf.profiler.ProfileOptionBuilder.time_and_memory()
+        pctx.add_auto_profiling('op', opts, [150, 200])
+        while global_step < num_train_steps:
+            ### Run a step ###
+            start_time = time.time()
+            try:
+                step_result = loaded_train_model.train(train_sess)
+                hparams.epoch_step += 1
+            except tf.errors.OutOfRangeError:
+                # Finished going through the training dataset.  Go to next epoch.
+                hparams.epoch_step = 0
+                utils.print_out(
+                    "# Finished an epoch, step %d. Perform external evaluation" %
+                    global_step)
+                run_sample_decode(infer_model, infer_sess, model_dir, hparams,
+                                  summary_writer, sample_src_data, sample_tgt_data)
+                run_external_eval(infer_model, infer_sess, model_dir, hparams,
+                                  summary_writer)
 
-      train_sess.run(
-          train_model.iterator.initializer,
-          feed_dict={train_model.skip_count_placeholder: 0})
-      continue
+                if avg_ckpts:
+                    run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
+                                          summary_writer, global_step)
 
-    # Process step_result, accumulate stats, and write summary
-    global_step, info["learning_rate"], step_summary = update_stats(
-        stats, start_time, step_result)
-    summary_writer.add_summary(step_summary, global_step)
+                train_sess.run(
+                    train_model.iterator.initializer,
+                    feed_dict={train_model.skip_count_placeholder: 0})
+                continue
 
-    # Once in a while, we print statistics.
-    if global_step - last_stats_step >= steps_per_stats:
-      last_stats_step = global_step
-      is_overflow = process_stats(
-          stats, info, global_step, steps_per_stats, log_f)
-      print_step_info("  ", global_step, info, get_best_results(hparams),
-                      log_f)
-      if is_overflow:
-        break
+            # Process step_result, accumulate stats, and write summary
+            global_step, info["learning_rate"], step_summary = update_stats(
+                stats, start_time, step_result)
+            summary_writer.add_summary(step_summary, global_step)
 
-      # Reset statistics
-      stats = init_stats()
+            # Once in a while, we print statistics.
+            if global_step - last_stats_step >= steps_per_stats:
+                last_stats_step = global_step
+                is_overflow = process_stats(
+                    stats, info, global_step, steps_per_stats, log_f)
+                print_step_info("  ", global_step, info, get_best_results(hparams),
+                                log_f)
+                if is_overflow:
+                    break
 
-    if global_step - last_eval_step >= steps_per_eval:
-      last_eval_step = global_step
-      utils.print_out("# Save eval, global step %d" % global_step)
-      add_info_summaries(summary_writer, global_step, info)
+                # Reset statistics
+                stats = init_stats()
 
-      # Save checkpoint
-      loaded_train_model.saver.save(
-          train_sess,
-          os.path.join(out_dir, "translate.ckpt"),
-          global_step=global_step)
+            if global_step - last_eval_step >= steps_per_eval:
+                last_eval_step = global_step
+                utils.print_out("# Save eval, global step %d" % global_step)
+                add_info_summaries(summary_writer, global_step, info)
 
-      # Evaluate on dev/test
-      run_sample_decode(infer_model, infer_sess,
-                        model_dir, hparams, summary_writer, sample_src_data,
-                        sample_tgt_data)
-      run_internal_eval(
-          eval_model, eval_sess, model_dir, hparams, summary_writer)
+                # Save checkpoint
+                loaded_train_model.saver.save(
+                    train_sess,
+                    os.path.join(out_dir, "translate.ckpt"),
+                    global_step=global_step)
 
-    if global_step - last_external_eval_step >= steps_per_external_eval:
-      last_external_eval_step = global_step
+                # Evaluate on dev/test
+                run_sample_decode(infer_model, infer_sess,
+                                  model_dir, hparams, summary_writer, sample_src_data,
+                                  sample_tgt_data)
+                run_internal_eval(
+                    eval_model, eval_sess, model_dir, hparams, summary_writer)
 
-      # Save checkpoint
-      loaded_train_model.saver.save(
-          train_sess,
-          os.path.join(out_dir, "translate.ckpt"),
-          global_step=global_step)
-      run_sample_decode(infer_model, infer_sess,
-                        model_dir, hparams, summary_writer, sample_src_data,
-                        sample_tgt_data)
-      run_external_eval(
-          infer_model, infer_sess, model_dir,
-          hparams, summary_writer)
+            if global_step - last_external_eval_step >= steps_per_external_eval:
+                last_external_eval_step = global_step
 
-      if avg_ckpts:
-        run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
-                              summary_writer, global_step)
+                # Save checkpoint
+                loaded_train_model.saver.save(
+                    train_sess,
+                    os.path.join(out_dir, "translate.ckpt"),
+                    global_step=global_step)
+                run_sample_decode(infer_model, infer_sess,
+                                  model_dir, hparams, summary_writer, sample_src_data,
+                                  sample_tgt_data)
+                run_external_eval(
+                    infer_model, infer_sess, model_dir,
+                    hparams, summary_writer)
+
+                if avg_ckpts:
+                    run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
+                                          summary_writer, global_step)
+
 
   # Done training
   loaded_train_model.saver.save(
