@@ -514,13 +514,12 @@ def train(hparams, scope=None, target_session=""):
   # This is the training loop.
   stats, info, start_train_time = before_train(
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
-
-  with tf.contrib.tfprof.ProfileContext('/tmp/train_dir',
+  builder = tf.profiler.ProfileOptionBuilder
+  opts = builder(builder.time_and_memory()).order_by('micros').build()
+  pctx= tf.contrib.tfprof.ProfileContext('/tmp/train_dir',
                                         trace_steps=range(100, 200, 3),
-                                        dump_steps=[200]) as pctx:
-        opts = tf.profiler.ProfileOptionBuilder.time_and_memory()
-        pctx.add_auto_profiling('op', opts, [150, 200])
-        while global_step < num_train_steps:
+                                        dump_steps=[200])
+  while global_step < num_train_steps:
             ### Run a step ###
             start_time = time.time()
             try:
@@ -541,11 +540,16 @@ def train(hparams, scope=None, target_session=""):
                     run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
                                           summary_writer, global_step)
 
+                # Enable tracing for next session.run.
+                pctx.trace_next_step()
+                # Dump the profile to '/tmp/train_dir' after the step.
+                pctx.dump_next_step()
                 train_sess.run(
                     train_model.iterator.initializer,
                     feed_dict={train_model.skip_count_placeholder: 0})
+                pctx.profiler.profile_operations(options=opts)
                 continue
-
+                
             # Process step_result, accumulate stats, and write summary
             global_step, info["learning_rate"], step_summary = update_stats(
                 stats, start_time, step_result)
@@ -600,7 +604,6 @@ def train(hparams, scope=None, target_session=""):
                 if avg_ckpts:
                     run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
                                           summary_writer, global_step)
-
 
   # Done training
   loaded_train_model.saver.save(
