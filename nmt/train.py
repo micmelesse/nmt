@@ -518,12 +518,17 @@ def train(hparams, scope=None, target_session=""):
   opts = builder(builder.time_and_memory()).order_by('micros').build()
   pctx= tf.contrib.tfprof.ProfileContext('/tmp/train_dir',
                                         trace_steps=range(100, 200, 3),
-                                        dump_steps=[200])
+                                        dump_steps=[200])                              
   while global_step < num_train_steps:
             ### Run a step ###
             start_time = time.time()
             try:
+                # Enable tracing for next session.run.
+                pctx.trace_next_step()
+                # Dump the profile to '/tmp/train_dir' after the step.
+                pctx.dump_next_step()
                 step_result = loaded_train_model.train(train_sess)
+                pctx.profiler.profile_operations(options=opts)
                 hparams.epoch_step += 1
             except tf.errors.OutOfRangeError:
                 # Finished going through the training dataset.  Go to next epoch.
@@ -539,15 +544,10 @@ def train(hparams, scope=None, target_session=""):
                 if avg_ckpts:
                     run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
                                           summary_writer, global_step)
-
-                # Enable tracing for next session.run.
-                pctx.trace_next_step()
-                # Dump the profile to '/tmp/train_dir' after the step.
-                pctx.dump_next_step()
+           
                 train_sess.run(
                     train_model.iterator.initializer,
                     feed_dict={train_model.skip_count_placeholder: 0})
-                pctx.profiler.profile_operations(options=opts)
                 continue
                 
             # Process step_result, accumulate stats, and write summary
