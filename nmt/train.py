@@ -514,12 +514,15 @@ def train(hparams, scope=None, target_session=""):
   # This is the training loop.
   stats, info, start_train_time = before_train(
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
+  
   builder = tf.profiler.ProfileOptionBuilder
   opts = builder(builder.time_and_memory()).order_by('micros').build()
-  pctx= tf.contrib.tfprof.ProfileContext('/tmp/train_dir',
-                                        trace_steps=range(100, 200, 3),
-                                        dump_steps=[200])                              
-  while global_step < num_train_steps:
+  with tf.contrib.tfprof.ProfileContext('/tmp/train_dir',
+                                        trace_steps=[],
+                                        dump_steps=[]) as pctx:                           
+  
+    while global_step < num_train_steps:
+            print("step: {}".format(global_step.item()))
             ### Run a step ###
             start_time = time.time()
             try:
