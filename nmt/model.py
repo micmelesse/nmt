@@ -324,7 +324,7 @@ class BaseModel(object):
         self.grad_norm_summary)
     return train_summary
 
-  def train(self, sess):
+  def train(self, sess,run_options=None, run_metadata=None):
     """Execute train graph."""
     assert self.mode == tf.contrib.learn.ModeKeys.TRAIN
     output_tuple = TrainOutputTuple(train_summary=self.train_summary,
@@ -335,7 +335,7 @@ class BaseModel(object):
                                     batch_size=self.batch_size,
                                     grad_norm=self.grad_norm,
                                     learning_rate=self.learning_rate)
-    return sess.run([self.update, output_tuple])
+    return sess.run([self.update, output_tuple],options=run_options,run_metadata=run_metadata)
 
   def eval(self, sess):
     """Execute eval graph."""
