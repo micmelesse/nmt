@@ -519,7 +519,11 @@ def train(hparams, scope=None, target_session=""):
   run_metadata = tf.RunMetadata()                  
   
   while global_step < num_train_steps:
-    print("step: %d"%global_step)
+    step_num="step: %d"%global_step
+    with open("/tmp/ROCBLAS_LOG_TRACE.txt",'a') as f:
+      f.write(step_num+"\n")
+
+    print(step_num)
     ### Run a step ###
     start_time = time.time()
     try:
