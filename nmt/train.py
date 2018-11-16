@@ -519,11 +519,8 @@ def train(hparams, scope=None, target_session=""):
   run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
   run_metadata = tf.RunMetadata()                  
   
-  os.environ["ROCBLAS_LAYER"]="1"
   while global_step < num_train_steps:
     step_num="step: %d"%global_step
-    os.environ["ROCBLAS_LOG_TRACE_PATH"]="/tmp/ROCBLAS_LOG_TRACE_STEP_%d"%global_step
-
     print(step_num)
     ### Run a step ###
     start_time = time.time()
