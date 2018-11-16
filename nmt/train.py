@@ -19,6 +19,7 @@ import math
 import os
 import random
 import time
+import sys
 
 import tensorflow as tf
 
@@ -518,10 +519,10 @@ def train(hparams, scope=None, target_session=""):
   run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
   run_metadata = tf.RunMetadata()                  
   
+  os.environ["ROCBLAS_LAYER"]="1"
   while global_step < num_train_steps:
     step_num="step: %d"%global_step
-    with open("/tmp/ROCBLAS_LOG_TRACE.txt",'a') as f:
-      f.write(step_num+"\n")
+    os.environ["ROCBLAS_LOG_TRACE_PATH"]="/tmp/ROCBLAS_LOG_TRACE_STEP_%d"%global_step
 
     print(step_num)
     ### Run a step ###
