@@ -518,10 +518,8 @@ def train(hparams, scope=None, target_session=""):
   
   run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
   run_metadata = tf.RunMetadata()                  
-  
   while global_step < num_train_steps:
-    step_num="step: %d"%global_step
-    print(step_num)
+    print("step: %d"%global_step)
     ### Run a step ###
     start_time = time.time()
     try:
@@ -568,41 +566,42 @@ def train(hparams, scope=None, target_session=""):
         stats = init_stats()
 
     if global_step - last_eval_step >= steps_per_eval:
-        last_eval_step = global_step
-        utils.print_out("# Save eval, global step %d" % global_step)
-        add_info_summaries(summary_writer, global_step, info)
+      last_eval_step = global_step
+      utils.print_out("# Save eval, global step %d" % global_step)
+      add_info_summaries(summary_writer, global_step, info)
 
-        # Save checkpoint
-        loaded_train_model.saver.save(
-            train_sess,
-            os.path.join(out_dir, "translate.ckpt"),
-            global_step=global_step)
+      # Save checkpoint
+      loaded_train_model.saver.save(
+          train_sess,
+          os.path.join(out_dir, "translate.ckpt"),
+          global_step=global_step)
 
-        # Evaluate on dev/test
-        run_sample_decode(infer_model, infer_sess,
-                          model_dir, hparams, summary_writer, sample_src_data,
-                          sample_tgt_data)
-        run_internal_eval(
-            eval_model, eval_sess, model_dir, hparams, summary_writer)
+      # Evaluate on dev/test
+      run_sample_decode(infer_model, infer_sess,
+                        model_dir, hparams, summary_writer, sample_src_data,
+                        sample_tgt_data)
+      run_internal_eval(
+          eval_model, eval_sess, model_dir, hparams, summary_writer)
 
     if global_step - last_external_eval_step >= steps_per_external_eval:
-        last_external_eval_step = global_step
+      last_external_eval_step = global_step
 
-        # Save checkpoint
-        loaded_train_model.saver.save(
-            train_sess,
-            os.path.join(out_dir, "translate.ckpt"),
-            global_step=global_step)
-        run_sample_decode(infer_model, infer_sess,
-                          model_dir, hparams, summary_writer, sample_src_data,
-                          sample_tgt_data)
-        run_external_eval(
-            infer_model, infer_sess, model_dir,
-            hparams, summary_writer)
+      # Save checkpoint
+      loaded_train_model.saver.save(
+          train_sess,
+          os.path.join(out_dir, "translate.ckpt"),
+          global_step=global_step)
+      run_sample_decode(infer_model, infer_sess,
+                        model_dir, hparams, summary_writer, sample_src_data,
+                        sample_tgt_data)
+      run_external_eval(
+          infer_model, infer_sess, model_dir,
+          hparams, summary_writer)
 
-        if avg_ckpts:
-            run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
-                                  summary_writer, global_step)
+      if avg_ckpts:
+          run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
+                                summary_writer, global_step)
+    break
 
   # Done training
   loaded_train_model.saver.save(
