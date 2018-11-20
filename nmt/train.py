@@ -516,41 +516,50 @@ def train(hparams, scope=None, target_session=""):
   stats, info, start_train_time = before_train(
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
   
-  run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-  run_metadata = tf.RunMetadata()                  
+  # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+  # run_metadata = tf.RunMetadata() 
+  builder = tf.profiler.ProfileOptionBuilder
+  opts = builder(builder.time_and_memory()).order_by('micros').build()
+  pctx = tf.contrib.tfprof.ProfileContext(
+      '/tmp/train_dir', trace_steps=[], dump_steps=[])
+
   while global_step < num_train_steps:
     print("step: %d"%global_step)
     ### Run a step ###
     start_time = time.time()
     try:
-        step_result = loaded_train_model.train(train_sess,run_options=run_options,run_metadata=run_metadata)
-        hparams.epoch_step += 1
+      pctx.trace_next_step()
+      pctx.dump_next_step()
+      step_result = loaded_train_model.train(train_sess)
+      # step_result = loaded_train_model.train(train_sess,run_options=run_options,run_metadata=run_metadata)
+      pctx.profiler.profile_operations(options=opts)
+      hparams.epoch_step += 1
     except tf.errors.OutOfRangeError:
-        # Finished going through the training dataset.  Go to next epoch.
-        hparams.epoch_step = 0
-        utils.print_out(
-            "# Finished an epoch, step %d. Perform external evaluation" %
-            global_step)
-        run_sample_decode(infer_model, infer_sess, model_dir, hparams,
-                          summary_writer, sample_src_data, sample_tgt_data)
-        run_external_eval(infer_model, infer_sess, model_dir, hparams,
-                          summary_writer)
+      # Finished going through the training dataset.  Go to next epoch.
+      hparams.epoch_step = 0
+      utils.print_out(
+          "# Finished an epoch, step %d. Perform external evaluation" %
+          global_step)
+      run_sample_decode(infer_model, infer_sess, model_dir, hparams,
+                        summary_writer, sample_src_data, sample_tgt_data)
+      run_external_eval(infer_model, infer_sess, model_dir, hparams,
+                        summary_writer)
 
-        if avg_ckpts:
-            run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
-                                  summary_writer, global_step)
+      if avg_ckpts:
+          run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
+                                summary_writer, global_step)
 
-        train_sess.run(
-            train_model.iterator.initializer,
-            feed_dict={train_model.skip_count_placeholder: 0})
-        continue
+      train_sess.run(
+          train_model.iterator.initializer,
+          feed_dict={train_model.skip_count_placeholder: 0})
+      continue
         
     # Process step_result, accumulate stats, and write summary
     global_step, info["learning_rate"], step_summary = update_stats(
         stats, start_time, step_result)
     summary_writer.add_summary(step_summary, global_step)
-    summary_writer.add_run_metadata(run_metadata, "step %d"%
-            global_step, global_step)
+    summary_writer.add_run_metadata(run_metadata, "step %d" %
+                                    global_step, global_step)
 
     # Once in a while, we print statistics.
     if global_step - last_stats_step >= steps_per_stats:
