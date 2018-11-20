@@ -558,8 +558,8 @@ def train(hparams, scope=None, target_session=""):
     global_step, info["learning_rate"], step_summary = update_stats(
         stats, start_time, step_result)
     summary_writer.add_summary(step_summary, global_step)
-    summary_writer.add_run_metadata(run_metadata, "step %d" %
-                                    global_step, global_step)
+    # summary_writer.add_run_metadata(run_metadata, "step %d" %
+    #                                 global_step, global_step)
 
     # Once in a while, we print statistics.
     if global_step - last_stats_step >= steps_per_stats:
