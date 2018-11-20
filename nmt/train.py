@@ -521,7 +521,7 @@ def train(hparams, scope=None, target_session=""):
   builder = tf.profiler.ProfileOptionBuilder
   opts = builder(builder.time_and_memory()).order_by('micros').build()
   pctx = tf.contrib.tfprof.ProfileContext(
-      '/tmp/train_dir', trace_steps=[], dump_steps=[])
+      '/tmp/profiles', trace_steps=[], dump_steps=[])
 
   while global_step < num_train_steps:
     print("step: %d"%global_step)
