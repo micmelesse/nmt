@@ -517,11 +517,12 @@ def train(hparams, scope=None, target_session=""):
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
   
   # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-  # run_metadata = tf.RunMetadata() 
+  # run_metadata = tf.RunMetadata()
   builder = tf.profiler.ProfileOptionBuilder
   opts = builder(builder.time_and_memory()).order_by('micros').build()
   pctx = tf.contrib.tfprof.ProfileContext(
-      '/tmp/profiles', trace_steps=[], dump_steps=[])
+      os.path.expanduser("~")+"/profiles", trace_steps=[], dump_steps=[])
+  pctx.__enter__() 
 
   while global_step < num_train_steps:
     print("step: %d"%global_step)
@@ -612,6 +613,7 @@ def train(hparams, scope=None, target_session=""):
                                 summary_writer, global_step)
     break
 
+  pctx.__exit__(None,None,None)
   # Done training
   loaded_train_model.saver.save(
       train_sess,
