@@ -324,7 +324,20 @@ class BaseModel(object):
         self.grad_norm_summary)
     return train_summary
 
-  def train(self, sess,run_options=None, run_metadata=None):
+  def train(self, sess):
+    """Execute train graph."""
+    assert self.mode == tf.contrib.learn.ModeKeys.TRAIN
+    output_tuple = TrainOutputTuple(train_summary=self.train_summary,
+                                    train_loss=self.train_loss,
+                                    predict_count=self.predict_count,
+                                    global_step=self.global_step,
+                                    word_count=self.word_count,
+                                    batch_size=self.batch_size,
+                                    grad_norm=self.grad_norm,
+                                    learning_rate=self.learning_rate)
+    return sess.run([self.update, output_tuple])
+    
+  def train_metadata(self, sess,run_options=None, run_metadata=None):
     """Execute train graph."""
     assert self.mode == tf.contrib.learn.ModeKeys.TRAIN
     output_tuple = TrainOutputTuple(train_summary=self.train_summary,

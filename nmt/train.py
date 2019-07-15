@@ -19,7 +19,6 @@ import math
 import os
 import random
 import time
-import sys
 
 import tensorflow as tf
 
@@ -515,25 +514,31 @@ def train(hparams, scope=None, target_session=""):
   # This is the training loop.
   stats, info, start_train_time = before_train(
       loaded_train_model, train_model, train_sess, global_step, hparams, log_f)
-  
-  # run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
-  # run_metadata = tf.RunMetadata()
-  builder = tf.profiler.ProfileOptionBuilder
-  opts = builder(builder.time_and_memory()).order_by('micros').build()
-  pctx = tf.contrib.tfprof.ProfileContext(
-      os.path.expanduser("~")+"/profiles", trace_steps=[], dump_steps=[])
-  pctx.__enter__() 
+
+  if hparams.run_metadata:
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
+  elif hparams.do_profile:
+    builder = tf.profiler.ProfileOptionBuilder
+    opts = builder(builder.time_and_memory()).order_by('micros').build()
+    pctx = tf.contrib.tfprof.ProfileContext(
+        os.path.expanduser("~")+"/profiles", trace_steps=[], dump_steps=[])
+    pctx.__enter__() 
 
   while global_step < num_train_steps:
     print("step: %d"%global_step)
     ### Run a step ###
     start_time = time.time()
     try:
-      pctx.trace_next_step()
-      pctx.dump_next_step()
-      step_result = loaded_train_model.train(train_sess)
-      # step_result = loaded_train_model.train(train_sess,run_options=run_options,run_metadata=run_metadata)
-      pctx.profiler.profile_operations(options=opts)
+      if hparams.run_metadata:
+        step_result = loaded_train_model.train_metadata(train_sess,run_options=run_options,run_metadata=run_metadata)
+      elif hparams.do_profile:
+        pctx.trace_next_step()
+        pctx.dump_next_step()
+        step_result = loaded_train_model.train(train_sess)
+        pctx.profiler.profile_operations(options=opts)
+      else:
+        step_result = loaded_train_model.train(train_sess)
       hparams.epoch_step += 1
     except tf.errors.OutOfRangeError:
       # Finished going through the training dataset.  Go to next epoch.
@@ -559,8 +564,9 @@ def train(hparams, scope=None, target_session=""):
     global_step, info["learning_rate"], step_summary = update_stats(
         stats, start_time, step_result)
     summary_writer.add_summary(step_summary, global_step)
-    # summary_writer.add_run_metadata(run_metadata, "step %d" %
-    #                                 global_step, global_step)
+    if hparams.run_metadata:
+      summary_writer.add_run_metadata(run_metadata, "step %d" %
+                                      global_step, global_step)
 
     # Once in a while, we print statistics.
     if global_step - last_stats_step >= steps_per_stats:
@@ -611,9 +617,9 @@ def train(hparams, scope=None, target_session=""):
       if avg_ckpts:
           run_avg_external_eval(infer_model, infer_sess, model_dir, hparams,
                                 summary_writer, global_step)
-    break
 
-  pctx.__exit__(None,None,None)
+  if hparams.do_profile:
+    pctx.__exit__(None,None,None)
   # Done training
   loaded_train_model.saver.save(
       train_sess,
