@@ -526,7 +526,6 @@ def train(hparams, scope=None, target_session=""):
     pctx.__enter__() 
 
   while global_step < num_train_steps:
-    print("step: %d"%global_step)
     ### Run a step ###
     start_time = time.time()
     try:
